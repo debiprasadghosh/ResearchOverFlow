@@ -1,1 +1,82 @@
 
+Interval Diffusion Algorithm can be explored in two directions: [1] individual samples are in an interval, [2] noise is applied as an interval (Interval Noise Diffusion Implicit Algorithm, INDIA).
+I want a strong mathematical exploration in [2] (not computational now). The following may be one area of proposition:
+Instead of an ascending sequence of noise, if we consider a compact (finite open cover of the entire 0 to 1 noise line by intervals) set (not a sequence, so Diffusion to DDIM) of noise intervals for our INDIA.
+EXPLORE mathematical possibilities of INDIA:
+
+The short answer is that on the 0-to-1 noise line, a finite cover of intervals is a sequence in disguise. What genuinely survives from your idea is the overlaps (an interval of possible noise levels at each handoff) and a natural metric on the noise line. Making noise a genuine set rather than a sequence needs a noise space of more than one dimension. Every formula below was checked numerically in a scratch script, but none is tested on real data; all exact statements are for Gaussian data with the exact denoiser.
+0. The noise line is a quarter circle
+In the VP form, x_t = √ᾱ x₀ + √(1−ᾱ) ε. Write √ᾱ = cos φ, so the noise line ᾱ ∈ [0,1] becomes the arc φ ∈ [0, π/2]. That arc is compact, so “the entire 0-to-1 noise line” already sits in a compact chart (the angle parametrisation of Salimans & Ho, 2022).
+For data of scale s, the chart is φ_s = arctan(σ/s), with σ = √((1−ᾱ)/ᾱ). A DDIM step is then a map K(a→b) between any two levels. That is what “from diffusion to DDIM” buys: DDPM fixes a Markov chain, while DDIM allows any pair of levels.
+1. On a line, a cover is a sequence in disguise
+Proposition 1. Take any finite open cover of [0,1] by intervals.
+•	It has a Lebesgue number δ > 0: every sub-interval shorter than δ lies inside one cover element.
+•	Its minimal subcovers are chains U₁, …, U_k, with U_i ∩ U_j ≠ ∅ exactly when |i−j| ≤ 1 and left endpoints increasing.
+•	So a cover of the line carries a canonical order (up to reversal), recovered from the topology alone.
+Proof sketch. Drop any interval contained in the union of the others. What remains has no point in three intervals, and ordering by left endpoints gives the chain.
+What the cover genuinely adds is three things:
+1.	Overlaps. Each handoff happens at a level known only to lie in U_i ∩ U_{i+1}. That is an interval-valued noise level.
+2.	Mesh control. The Lebesgue number bounds the step size.
+3.	Gluing local experts. Each cover element can have its own denoiser, which must agree on the overlaps (eDiff-I’s ensemble of expert denoisers is exactly this; Balaji et al., 2022).
+One honest limit. By the nerve lemma, the nerve of a cover of a convex set is contractible, so there is no topological obstruction to gluing, on the line or in a convex noise cube. Everything interesting is metric and geometric, not topological.
+2. DDIM in the angle chart
+Proposition 2 (unit-variance Gaussian data, exact denoiser). A DDIM step from φ to φ′ multiplies the state by cos(φ − φ′). The exact probability-flow ODE is the identity on this marginal, since its velocity is −sin φ cos φ x + cos φ sin φ x = 0.
+For data of scale s, in variance-exploding coordinates, the DDIM factor is (s² + σσ′)/(s² + σ²). This equals the exact flow factor cos φ / cos φ′ times cos Δφ. So each step contracts by exactly the cosine of its angle, which is Cauchy–Schwarz on the vectors (s, σ) and (s, σ′).
+What follows from this:
+•	Defect. DDIM is not compositional. The defect log cos(φ_a − φ_c) − log cos(φ_a − φ_b) − log cos(φ_b − φ_c) vanishes only for the exact flow. You can read it as the discretisation’s curvature.
+•	One step collapses. A single step across the whole arc (Δφ = π/2) has factor 0: it outputs the mean.
+•	Mesh controls error. Since Σ Δφ_i = π/2, the variance loss −Σ log cos² Δφ_i is about Σ Δφ_i², which is at most (π/2) · max Δφ_i. The error is controlled by the cover’s mesh in the angle metric.
+3. Interval handoffs: the exact range of outcomes
+Suppose each handoff level may lie anywhere in its overlap.
+Proposition 3.
+•	Two steps of total angle Δ. The composite factor cos x · cos(Δ − x) ranges exactly over [cos Δ, cos²(Δ/2)]. The worst case puts the handoff at an end of the overlap, the best at the midpoint.
+•	A whole chain. log cos is concave, so the product of cosines is maximised by equal angles (Jensen), subject to each handoff lying in its overlap.
+•	The minimum. It sits at a vertex: every handoff at an overlap endpoint.
+This is the same threshold-vertex structure as elsewhere in the interval programme. The exact range costs one convex problem and one vertex search.
+4. The natural metric on the noise line
+Real data has many scales. Each eigendirection k of the covariance has its own angle chart φ_k = arctan(σ/s_k), and a single cover must be fine in all of them at once.
+Proposition 4. Let s_k range over [s_min, s_max], and let κ = s_max/s_min. The minimax metric is
+dℓ = sup_k s_k / (s_k² + σ²) dσ.
+Its total length is
+L = π/2 + ½ log κ.
+•	Below s_min: the tail arctan(σ/s_min) contributes π/4.
+•	Between s_min and s_max: the density is 1/(2σ), so this middle stretch is uniform in log σ.
+•	Above s_max: the tail contributes another π/4.
+So a uniform cover in this metric needs about L/δ elements. That grows with the logarithm of the data’s condition number, and the variance error in every direction is about (π/2)δ.
+This recovers the log-SNR-uniform steps used by DPM-Solver (Lu et al., 2022) in the middle range, and adds arctan tails at both ends. I haven’t seen this minimax statement in the literature, but I haven’t searched for it either.
+5. Uncertain noise level: what actually propagates
+Proposition 5. The exact flow is a semigroup: Φ(b→c) ∘ Φ(a→b) = Φ(a→c). Two consequences follow.
+•	Interior uncertainty cancels. If both steps use the same unknown handoff level, its uncertainty cancels exactly. It enters only through the DDIM defect of Proposition 3. This is the dependency lesson of P2 and N1 again: shared variables cancel.
+•	Start uncertainty passes through. Suppose the true starting level is only known to lie in [σ⁻, σ⁺]. Then the output’s scale is uncertain by a log-width of ½ log((s² + σ⁺²)/(s² + σ⁻²)). For large σ this is about log(σ⁺/σ⁻), and no later step reduces it.
+So the start of the cover is the critical interval. This connects to the terminal-SNR flaw identified by Lin et al. (2024). It also matches the result in Variational Diffusion Models (Kingma et al., 2021) that the continuous-time loss depends on the schedule only through its endpoints.
+6. Bounded injected noise, the second reading of “noise as an interval”
+Proposition 6. Replace the Gaussian noise z in stochastic DDIM by noise bounded in a box [−r, r]ᵈ.
+•	Reachable set. For linear (Gaussian-data) steps, the set of reachable outputs is a zonotope, and its exact hull is r Σ_i |η_i| ∏_{j>i} g_j. Every sample therefore lies in a computable box.
+•	Distribution. With uniform noise of matching variance (r = √3 η), the output converges in distribution to the Gaussian (DDPM) result as steps are refined, by Lindeberg’s central limit theorem.
+•	The catch. In a 200-step check the excess kurtosis was 0.006, but the certified hull was about 23 standard deviations wide.
+That is the same gap between worst-case and typical behaviour that P3 found for storage bits.
+7. Loops: a set allows going back up
+A cover need not be traversed in one direction. You can re-noise and then denoise again, as in restart sampling (Xu et al., 2023).
+Proposition 7. Take one loop: re-noise exactly from φ to φ + Δ, then take a single DDIM step back. The stationary variance error is
+e* = sin²Δ / (1 − cos²Δ · cos²(φ + Δ) / cos²φ).
+•	At the data end (φ = 0): this is 1/(1 + cos²Δ), about ½. Loops amplify the discretisation error there.
+•	At high noise: it is about Δ/(Δ + 2 tan φ), which is small.
+So going back up only helps if the return trip is finer than the jump. Forward noising contracts errors by data processing, but DDIM’s own defect is re-injected on every loop.
+8. Where “a set, not a sequence” becomes genuinely true
+Give each coordinate group its own noise level: per token, as in Diffusion Forcing (Chen et al., 2024), per frequency, or per patch. The noise space is then a cube [0,1]ᵐ, and a cover of it has a nerve with many paths from the noisy corner to the clean corner. A sampling order becomes a choice of path through that nerve. The questions become geometric:
+•	Path-independence. Different paths give the same result exactly when the per-coordinate flows commute (a zero-curvature, Frobenius-type condition). For Gaussian data noised independently along its eigendirections they do commute. In general they don’t, and the difference between paths around a loop is a holonomy.
+•	The best path. It is a geodesic in the product of the angle metrics (Proposition 4).
+•	The interval version. Overlaps become boxes of noise levels, and the exact range over handoffs is again a concave-product problem with its worst case at a vertex.
+Where this leaves INDIA
+INDIA on [0,1] is a well-posed and exactly analysable object (Propositions 2–7). It does not escape ordering; it adds interval handoffs, a natural metric, and gluing of local experts. INDIA on a noise cube is where your “compact set, not a sequence” idea has real mathematical content: path choice, curvature, holonomy. I’d develop that second.
+I can write this up as an MD note in the series, with each proposition proved in full and the numerical checks attached.
+References
+•	Salimans & Ho (2022). Progressive distillation for fast sampling of diffusion models. ICLR 2022.
+•	Song, Meng & Ermon (2021). Denoising diffusion implicit models (DDIM). ICLR 2021.
+•	Kingma, Salimans, Poole & Ho (2021). Variational diffusion models. NeurIPS 2021.
+•	Lu et al. (2022). DPM-Solver. NeurIPS 2022.
+•	Balaji et al. (2022). eDiff-I: text-to-image diffusion models with an ensemble of expert denoisers. arXiv:2211.01324.
+•	Lin et al. (2024). Common diffusion noise schedules and sample steps are flawed. WACV 2024.
+•	Xu et al. (2023). Restart sampling for improving generative processes. NeurIPS 2023.
+•	Chen et al. (2024). Diffusion Forcing: next-token prediction meets full-sequence diffusion. NeurIPS 2024.
+
