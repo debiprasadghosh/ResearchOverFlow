@@ -1,1 +1,5 @@
+Explore and write a paper on an ADE-based AI Agent Harness framework, in which multi-objective optimization is addressed using the approach from the density (Harmony) paper, and the layers of a GPT-like backbone applied to ADE correspond to the different layers of the Harness (Prompts, Tools, Memory, Workspace, executable components and runtime, guardrails, Ablation, Reason, Act, Observe, Evaluate, and Verification Gate). The loop within the harness is autoregression, where the next token combined with the old state produces the new state, while the model weights remain fixed.
+https://arxiv.org/pdf/2610.18813
 
+https://arxiv.org/pdf/2610.15150
+This paper will introduce the basic concepts of AI Harness to the Construction Industry (Construction Harness).
